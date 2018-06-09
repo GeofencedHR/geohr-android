@@ -1,5 +1,6 @@
 package com.epgeotrack.app.ep_geo_tracking;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
@@ -72,13 +73,15 @@ public class MainActivity extends AppCompatActivity
         int id = item.getItemId();
 
         if (id == R.id.nav_work_places) {
-
+            Intent intent = new Intent(MainActivity.this, WorkPlacesActivity.class);
+            startActivity(intent);
         } else if (id == R.id.nav_checkinouts) {
 
         } else if (id == R.id.nav_settings) {
 
         } else if (id == R.id.nav_logout) {
-
+            Intent intent = new Intent(MainActivity.this, LoginActivity.class);
+            startActivity(intent);
         }
 
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
