@@ -3,7 +3,7 @@ package com.epgeotrack.app.ep_geo_tracking;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.os.Bundle;
-import android.support.v4.app.FragmentActivity;
+import android.support.v7.app.AppCompatActivity;
 import android.widget.TextView;
 
 import com.google.android.gms.maps.CameraUpdate;
@@ -19,7 +19,7 @@ import com.google.maps.android.ui.IconGenerator;
 
 import java.util.HashMap;
 
-public class WorkPlacesActivity extends FragmentActivity implements OnMapReadyCallback {
+public class WorkPlacesActivity extends AppCompatActivity implements OnMapReadyCallback {
 
     private GoogleMap mMap;
 
