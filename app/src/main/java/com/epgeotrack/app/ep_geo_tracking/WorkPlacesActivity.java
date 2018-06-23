@@ -18,6 +18,7 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.maps.android.ui.IconGenerator;
 
 import java.util.HashMap;
+import java.util.Objects;
 
 public class WorkPlacesActivity extends AppCompatActivity implements OnMapReadyCallback {
 
@@ -31,6 +32,8 @@ public class WorkPlacesActivity extends AppCompatActivity implements OnMapReadyC
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
+
+        Objects.requireNonNull(getSupportActionBar()).setDisplayHomeAsUpEnabled(true);
     }
 
 
