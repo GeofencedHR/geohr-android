@@ -20,4 +20,6 @@
         completions."
     </string>
     <string name="title_activity_work_places">Work places</string>
+    <string name="title_activity_settings">Settings</string>
+    <string name="title_activity_check_ins">Check-in/out(s)</string>
 </resources>

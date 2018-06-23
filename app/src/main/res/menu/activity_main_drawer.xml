@@ -8,9 +8,6 @@
             android:id="@+id/nav_work_places"
             android:title="Work places" />
         <item
-            android:id="@+id/nav_checkinouts"
-            android:title="Check in/outs" />
-        <item
             android:id="@+id/nav_settings"
             android:title="Settings" />
         <item
