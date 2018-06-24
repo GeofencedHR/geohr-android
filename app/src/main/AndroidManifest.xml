@@ -22,7 +22,7 @@
         android:theme="@style/AppTheme">
         <activity
             android:name=".MainActivity"
-            android:label="@string/title_activity_check_ins"
+            android:label="@string/title_activity_work_places"
             android:theme="@style/AppTheme.NoActionBar" />
         <activity
             android:name=".LoginActivity"
@@ -46,13 +46,12 @@
             android:value="@string/google_maps_key" />
 
         <activity
-            android:name=".WorkPlacesActivity"
-            android:label="@string/title_activity_work_places"
-            android:parentActivityName=".MainActivity" />
-
-        <activity
             android:name=".SettingsActivity"
             android:label="@string/title_activity_settings"
+            android:parentActivityName=".MainActivity" />
+        <activity
+            android:name=".CheckinoutsActivity"
+            android:label="@string/title_activity_check_ins"
             android:parentActivityName=".MainActivity" />
     </application>
 

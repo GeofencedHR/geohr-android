@@ -5,8 +5,8 @@
 
     <group android:checkableBehavior="single">
         <item
-            android:id="@+id/nav_work_places"
-            android:title="Work places" />
+            android:id="@+id/check_in_outs"
+            android:title="Check-in/outs" />
         <item
             android:id="@+id/nav_settings"
             android:title="Settings" />

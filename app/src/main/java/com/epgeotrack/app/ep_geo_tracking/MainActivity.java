@@ -92,8 +92,8 @@ public class MainActivity extends AppCompatActivity
         // Handle navigation view item clicks here.
         int id = item.getItemId();
 
-        if (id == R.id.nav_work_places) {
-            Intent intent = new Intent(MainActivity.this, WorkPlacesActivity.class);
+        if (id == R.id.check_in_outs) {
+            Intent intent = new Intent(MainActivity.this, CheckinoutsActivity.class);
             startActivity(intent);
         } else if (id == R.id.nav_settings) {
             Intent intent = new Intent(MainActivity.this, SettingsActivity.class);
@@ -125,8 +125,13 @@ public class MainActivity extends AppCompatActivity
             builder.include(latLng);
         }
 
-        CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngBounds(builder.build(), 150);
-        mMap.moveCamera(cameraUpdate);
+        final CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngBounds(builder.build(), 150);
+        mMap.setOnMapLoadedCallback(new GoogleMap.OnMapLoadedCallback() {
+            @Override
+            public void onMapLoaded() {
+                mMap.moveCamera(cameraUpdate);
+            }
+        });
         googleMap.animateCamera(cameraUpdate);
     }
 
