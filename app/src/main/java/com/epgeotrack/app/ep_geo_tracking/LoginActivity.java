@@ -3,7 +3,10 @@ package com.epgeotrack.app.ep_geo_tracking;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.annotation.TargetApi;
+import android.app.AlarmManager;
 import android.app.LoaderManager.LoaderCallbacks;
+import android.app.PendingIntent;
+import android.content.Context;
 import android.content.CursorLoader;
 import android.content.Intent;
 import android.content.Loader;
@@ -12,9 +15,15 @@ import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.provider.ContactsContract;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+import android.support.design.widget.Snackbar;
+import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -24,15 +33,32 @@ import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
+
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.common.api.Status;
+import com.google.android.gms.location.Geofence;
+import com.google.android.gms.location.GeofencingRequest;
+import com.google.android.gms.location.LocationServices;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * A login screen that offers login via email/password.
  */
-public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<Cursor> {
+public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<Cursor>,
+        GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, ResultCallback<Status>,
+        ActivityCompat.OnRequestPermissionsResultCallback {
 
+    protected GoogleApiClient googleApiClient;
+
+    protected static final String TAG = "LoginActivity";
+
+    private PendingIntent mGeofencePendingIntent;
     /**
      * A dummy authentication store containing known user names and passwords.
      * TODO: remove after connecting to a real authentication system.
@@ -74,12 +100,26 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         mEmailSignInButton.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View view) {
+                Intent intent = new Intent("com.epgeotrack.GEO_SERVICE");
+                sendBroadcast(intent);
                 attemptLogin();
             }
         });
 
         mLoginFormView = findViewById(R.id.login_form);
         mProgressView = findViewById(R.id.login_progress);
+        mGeofencePendingIntent = null;
+
+        //handle permissions
+        requestMapPermission();
+
+        Intent alarm = new Intent(getApplicationContext(), AlarmReceiver.class);
+        boolean alarmRunning = (PendingIntent.getBroadcast(getApplicationContext(), 0, alarm, PendingIntent.FLAG_NO_CREATE) != null);
+        if (!alarmRunning) {
+            PendingIntent pendingIntent = PendingIntent.getBroadcast(getApplicationContext(), 0, alarm, 0);
+            AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+            Objects.requireNonNull(alarmManager).setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP, SystemClock.elapsedRealtime(), 60000, pendingIntent);
+        }
     }
 
     /**
@@ -289,6 +329,206 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         protected void onCancelled() {
             mAuthTask = null;
             showProgress(false);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+
+        if (requestCode == 123) {
+            Log.d(TAG, "Location permission received");
+            buildGoogleApiClient();
+            googleApiClient.connect();
+        }
+    }
+
+    private void requestMapPermission() {
+        View loginLayout = findViewById(R.id.login_layout);
+        // Permission has not been granted and must be requested.
+        if (/*ActivityCompat.shouldShowRequestPermissionRationale(this,
+                Manifest.permission.MAPS_RECEIVE) ||*/
+                ActivityCompat.shouldShowRequestPermissionRationale(this,
+                        android.Manifest.permission.ACCESS_FINE_LOCATION) ||
+                        ActivityCompat.shouldShowRequestPermissionRationale(this,
+                                android.Manifest.permission.ACCESS_COARSE_LOCATION)) {
+            // Provide an additional rationale to the user if the permission was not granted
+            // and the user would benefit from additional context for the use of the permission.
+            // Display a SnackBar with cda button to request the missing permission.
+            Snackbar.make(loginLayout, "Location permission required",
+                    Snackbar.LENGTH_INDEFINITE).setAction("Ok", new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    // Request the permission
+                    ActivityCompat.requestPermissions(LoginActivity.this,
+                            new String[]{/*Manifest.permission.MAPS_RECEIVE,*/
+                                    android.Manifest.permission.ACCESS_FINE_LOCATION,
+                                    android.Manifest.permission.ACCESS_COARSE_LOCATION},
+                            123);
+                }
+            }).show();
+
+        } else {
+            Snackbar.make(loginLayout, "Location permission not available", Snackbar.LENGTH_SHORT).show();
+            // Request the permission. The result will be received in onRequestPermissionResult().
+            ActivityCompat.requestPermissions(this,
+                    new String[]{/*Manifest.permission.MAPS_RECEIVE,*/
+                            android.Manifest.permission.ACCESS_FINE_LOCATION,
+                            android.Manifest.permission.ACCESS_COARSE_LOCATION}, 123);
+        }
+    }
+
+    protected synchronized void buildGoogleApiClient() {
+        googleApiClient = new GoogleApiClient.Builder(getApplicationContext())
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .addApi(LocationServices.API)
+                .build();
+    }
+
+    @Override
+    public void onConnected(@Nullable Bundle bundle) {
+        Log.i(TAG, "Connected to GoogleApiClient");
+        addGeofences();
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+        Log.i(TAG, "Connection suspended");
+    }
+
+    @Override
+    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+        Log.i(TAG, "Connection failed: ConnectionResult.getErrorCode() = " + connectionResult.getErrorCode());
+    }
+
+    private void addGeofences() {
+        if (!googleApiClient.isConnected()) {
+            Toast.makeText(this, "Not connected with Map API client", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        try {
+            LocationServices.GeofencingApi.addGeofences(
+                    googleApiClient,
+                    // The GeofenceRequest object.
+                    getGeofencingRequest(),
+                    // A pending intent that that is reused when calling removeGeofences(). This
+                    // pending intent is used to generate an intent when a matched geofence
+                    // transition is observed.
+                    getGeofencePendingIntent()
+            ).setResultCallback(this); // Result processed in onResult().
+
+        } catch (SecurityException securityException) {
+            // Catch exception generated if the app does not use ACCESS_FINE_LOCATION permission.
+            Log.e(TAG, securityException.getLocalizedMessage());
+        }
+    }
+
+    private PendingIntent getGeofencePendingIntent() {
+        String GEOFENCE_ACTION = "com.epgeotrack.app.ep_geo_tracking.ACTION_RECEIVE_GEOFENCE";
+        if (null != mGeofencePendingIntent) {
+            // Return the existing intent
+            return mGeofencePendingIntent;
+            // If no PendingIntent exists
+        } else {
+            // Create an Intent pointing to the IntentService
+            Intent intent = new Intent(GEOFENCE_ACTION);
+            mGeofencePendingIntent = PendingIntent.getBroadcast(
+                    getApplicationContext(),
+                    123,
+                    intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT);
+            return mGeofencePendingIntent;
+        }
+    }
+
+    private GeofencingRequest getGeofencingRequest() {
+        GeofencingRequest.Builder builder = new GeofencingRequest.Builder();
+
+        // The INITIAL_TRIGGER_ENTER flag indicates that geofencing service should trigger a
+        // GEOFENCE_TRANSITION_ENTER notification when the geofence is added and if the device
+        // is already inside that geofence.
+        builder.setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER);
+
+        // Add the geofences to be monitored by geofencing service.
+        builder.addGeofences(createGeoFenceList());
+
+        // Return a GeofencingRequest.
+        return builder.build();
+    }
+
+    /*
+     * SouthView = 3.112990, 101.664765
+     * ViewQwest - 3.112941, 101.667357
+     * KLGateway - 3.112674, 101.662819
+     * */
+    private ArrayList<Geofence> createGeoFenceList() {
+        ArrayList<Geofence> geofenceList = new ArrayList<Geofence>();
+
+        Geofence southViewFence = new Geofence.Builder()
+                .setRequestId("SOUTH_VIEW")
+                .setCircularRegion(
+                        3.112990,
+                        101.664765,
+                        100
+                )
+                .setExpirationDuration(86400000)
+                .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER |
+                        Geofence.GEOFENCE_TRANSITION_EXIT)
+                .build();
+
+        Geofence viewQwestFence = new Geofence.Builder()
+                .setRequestId("VIEW_QWEST")
+                .setCircularRegion(
+                        3.112941,
+                        101.667357,
+                        100
+                )
+                .setExpirationDuration(86400000)
+                .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER |
+                        Geofence.GEOFENCE_TRANSITION_EXIT)
+                .build();
+
+        Geofence klGatewayFence = new Geofence.Builder()
+                .setRequestId("KL_GATEWAY")
+                .setCircularRegion(
+                        3.112674,
+                        101.662819,
+                        100
+                )
+                .setExpirationDuration(86400000)
+                .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER |
+                        Geofence.GEOFENCE_TRANSITION_EXIT)
+                .build();
+
+        geofenceList.add(southViewFence);
+        geofenceList.add(viewQwestFence);
+        geofenceList.add(klGatewayFence);
+        return geofenceList;
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if (googleApiClient != null) {
+            googleApiClient.disconnect();
+        }
+    }
+
+    @Override
+    public void onResult(@NonNull Status status) {
+        if (status.isSuccess()) {
+            Log.d(TAG, "Added Geo fence");
+        } else {
+            // Get the status code for the error and log it using a user-friendly message.
+            String errorMessage = status.getStatusCode() + " - Error occurred.";
+            Log.e(TAG, errorMessage);
         }
     }
 }
