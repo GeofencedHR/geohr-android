@@ -16,6 +16,7 @@ import com.google.android.gms.location.GeofenceStatusCodes;
 import com.google.android.gms.location.GeofencingEvent;
 
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class GeofenceBroadcastReceiver extends BroadcastReceiver {
 
@@ -136,7 +137,7 @@ public class GeofenceBroadcastReceiver extends BroadcastReceiver {
             notificationManager.createNotificationChannel(channel);
         }
 
-        notificationManager.notify(1, notificationBuild.build());
+        notificationManager.notify(ThreadLocalRandom.current().nextInt(0, 1000 + 1), notificationBuild.build());
 
 //        int requestID = (int) System.currentTimeMillis();
 //        Intent event_detail_intent = new Intent(context, LocationDetailActivity.class);
